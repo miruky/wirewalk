@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img">
+  <title>wirewalk</title>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="#15171c"/>
+  <path d="M 14 20 H 50 M 14 32 H 50 M 14 44 H 50" fill="none" stroke="#4a4e59" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="24" cy="20" r="4.5" fill="#3bc9db"/>
+  <circle cx="40" cy="32" r="4.5" fill="#cfd4dd"/>
+  <circle cx="30" cy="44" r="4.5" fill="#cfd4dd"/>
+</svg>
