@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 330" role="img" aria-labelledby="arch-title">
+  <title id="arch-title">wirewalk の構成図。シナリオからbuildTimelineが決定的なステップ列を作り、Diagramが進行状況に応じてSVGを描く。再生制御はmain.tsが持ち、シナリオはURLハッシュと相互変換される。</title>
+  <style>
+    .name { font: 600 14px 'Hiragino Sans', 'Noto Sans JP', sans-serif; fill: #1c1e21; }
+    .file { font: 11px ui-monospace, 'SF Mono', Menlo, monospace; fill: #686d76; }
+    .desc { font: 11px 'Hiragino Sans', 'Noto Sans JP', sans-serif; fill: #686d76; }
+    .label { font: 11px 'Hiragino Sans', 'Noto Sans JP', sans-serif; fill: #686d76; }
+    .caption { font: 12px 'Hiragino Sans', 'Noto Sans JP', sans-serif; fill: #686d76; }
+    .heading { font: 700 16px 'Hiragino Sans', 'Noto Sans JP', sans-serif; fill: #1c1e21; }
+    .box { fill: #ffffff; stroke: #dcdfe3; stroke-width: 1.2; }
+    .box-state { fill: #e3f3f6; stroke: #0b7285; }
+    .flow { stroke: #9aa0aa; fill: none; stroke-width: 1.6; }
+    .arrow { fill: #9aa0aa; }
+    @media (prefers-color-scheme: dark) {
+      .name, .heading { fill: #e7e8ea; }
+      .file, .desc, .label, .caption { fill: #9aa0a8; }
+      .box { fill: #1a1d21; stroke: #3a3e46; }
+      .box-state { fill: #123a42; stroke: #3bc9db; }
+      .flow { stroke: #6a707c; }
+      .arrow { fill: #6a707c; }
+    }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 8 4 L 0 8 z" class="arrow"/>
+    </marker>
+  </defs>
+
+  <text x="16" y="34" class="heading">wirewalk の構成</text>
+
+  <rect x="16" y="64" width="190" height="80" rx="10" class="box box-state"/>
+  <text x="111" y="92" text-anchor="middle" class="name">シナリオ</text>
+  <text x="111" y="110" text-anchor="middle" class="file">src/lib/scenario.ts</text>
+  <text x="111" y="128" text-anchor="middle" class="desc">ホスト名・TLS・キャッシュ</text>
+
+  <rect x="266" y="64" width="200" height="80" rx="10" class="box"/>
+  <text x="366" y="92" text-anchor="middle" class="name">buildTimeline</text>
+  <text x="366" y="110" text-anchor="middle" class="file">src/lib/timeline.ts</text>
+  <text x="366" y="128" text-anchor="middle" class="desc">登場ノードとステップ列を生成</text>
+
+  <rect x="526" y="64" width="190" height="80" rx="10" class="box"/>
+  <text x="621" y="92" text-anchor="middle" class="name">Diagram</text>
+  <text x="621" y="110" text-anchor="middle" class="file">src/ui/diagram.ts</text>
+  <text x="621" y="128" text-anchor="middle" class="desc">シーケンス図のSVG描画</text>
+
+  <rect x="766" y="64" width="178" height="80" rx="10" class="box"/>
+  <text x="855" y="92" text-anchor="middle" class="name">再生制御</text>
+  <text x="855" y="110" text-anchor="middle" class="file">src/main.ts</text>
+  <text x="855" y="128" text-anchor="middle" class="desc">再生・段送り・速度・解説</text>
+
+  <path d="M 206 104 H 260" class="flow" marker-end="url(#arrow)"/>
+  <path d="M 466 104 H 520" class="flow" marker-end="url(#arrow)"/>
+  <text x="493" y="94" text-anchor="middle" class="label">Timeline</text>
+  <path d="M 766 104 H 722" class="flow" marker-end="url(#arrow)"/>
+  <text x="744" y="94" text-anchor="middle" class="label">setProgress</text>
+
+  <rect x="16" y="204" width="190" height="60" rx="10" class="box"/>
+  <text x="111" y="228" text-anchor="middle" class="name">URLハッシュ</text>
+  <text x="111" y="246" text-anchor="middle" class="desc">#host=...&amp;tls=off</text>
+
+  <path d="M 111 144 V 198" class="flow" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+  <text x="123" y="175" class="label">相互変換(共有と復元)</text>
+
+  <path d="M 855 144 V 234 H 372 V 150" class="flow" marker-end="url(#arrow)"/>
+  <text x="610" y="226" text-anchor="middle" class="label">条件変更で再構築</text>
+
+  <text x="16" y="310" class="caption">ステップ列は決定的で、解説文・ラベル・フェーズ順序はすべて timeline.ts のテストで検証する。描画は進行インデックスのクラス切替だけで動く。</text>
+</svg>
