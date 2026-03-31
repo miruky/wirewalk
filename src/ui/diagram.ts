@@ -109,6 +109,17 @@ export class Diagram {
       const x2 = laneX.get(step.to) as number;
       const group = svgEl('g', { class: `arrow phase-${step.phase} hidden` });
 
+      // 現在の行を薄い帯で示す。図の幅いっぱいに敷き、currentのときだけ見せる
+      group.append(
+        svgEl('rect', {
+          x: '0',
+          y: String(y - ROW_GAP / 2),
+          width: String(width),
+          height: String(ROW_GAP),
+          class: 'row-band',
+        }),
+      );
+
       if (step.phase !== lastPhase) {
         lastPhase = step.phase;
         const chip = svgEl('text', {
