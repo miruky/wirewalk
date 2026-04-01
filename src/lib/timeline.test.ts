@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Scenario } from './scenario';
-import { buildTimeline, type Phase } from './timeline';
+import { buildTimeline, phaseSegments, type Phase } from './timeline';
 
 const FULL: Scenario = {
   host: 'example.com',
@@ -101,5 +101,27 @@ describe('buildTimeline', () => {
       'auth',
       'server',
     ]);
+  });
+});
+
+describe('phaseSegments', () => {
+  it('連続フェーズをまとめ、開始位置と手数を返す', () => {
+    const segments = phaseSegments(buildTimeline(FULL).steps);
+    expect(segments.map((s) => s.phase)).toEqual(['dns', 'tcp', 'tls', 'http', 'close']);
+    expect(segments.map((s) => s.count)).toEqual([8, 3, 3, 2, 4]);
+    expect(segments.map((s) => s.start)).toEqual([0, 8, 11, 14, 16]);
+    expect(segments[0]?.name).toBe('DNS解決');
+  });
+
+  it('手数の合計はステップ数に一致する', () => {
+    const steps = buildTimeline({ ...FULL, tlsVersion: '1.2' }).steps;
+    const total = phaseSegments(steps).reduce((sum, s) => sum + s.count, 0);
+    expect(total).toBe(steps.length);
+  });
+
+  it('TLSなしではTLS区間が現れない', () => {
+    const segments = phaseSegments(buildTimeline({ ...FULL, tls: false }).steps);
+    expect(segments.some((s) => s.phase === 'tls')).toBe(false);
+    expect(segments.map((s) => s.phase)).toEqual(['dns', 'tcp', 'http', 'close']);
   });
 });
