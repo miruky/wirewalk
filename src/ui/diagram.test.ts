@@ -3,7 +3,13 @@ import { describe, expect, it } from 'vitest';
 import { buildTimeline } from '../lib/timeline';
 import { Diagram } from './diagram';
 
-const SCENARIO = { host: 'example.com', tls: true, dnsCached: false };
+const SCENARIO = {
+  host: 'example.com',
+  tls: true,
+  tlsVersion: '1.3' as const,
+  dnsCached: false,
+  rttMs: 80,
+};
 
 function mount(): { host: HTMLElement; diagram: Diagram } {
   const host = document.createElement('div');

@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import type { Scenario } from './scenario';
 import { buildTimeline, type Phase } from './timeline';
 
-const FULL = { host: 'example.com', tls: true, dnsCached: false };
+const FULL: Scenario = {
+  host: 'example.com',
+  tls: true,
+  tlsVersion: '1.3',
+  dnsCached: false,
+  rttMs: 80,
+};
 
-function phases(scenario: typeof FULL): Phase[] {
+function phases(scenario: Scenario): Phase[] {
   return buildTimeline(scenario).steps.map((step) => step.phase);
 }
 
@@ -34,6 +41,24 @@ describe('buildTimeline', () => {
     const timeline = buildTimeline({ ...FULL, tls: false });
     expect(timeline.steps.some((step) => step.phase === 'tls')).toBe(false);
     expect(timeline.steps.length).toBe(17);
+  });
+
+  it('TLS1.2はハンドシェイクが4ステップ(2-RTT)になり全体は21ステップ', () => {
+    const timeline = buildTimeline({ ...FULL, tlsVersion: '1.2' });
+    expect(timeline.steps.filter((step) => step.phase === 'tls').length).toBe(4);
+    expect(timeline.steps.length).toBe(21);
+    const last = timeline.steps.filter((step) => step.phase === 'tls').at(-1);
+    expect(last?.title).toContain('暗号化開始(サーバ)');
+  });
+
+  it('経過時間は片道遅延を積み上げ、往復遅延を変えると比例して伸びる', () => {
+    const slow = buildTimeline({ ...FULL, rttMs: 200 });
+    const fast = buildTimeline({ ...FULL, rttMs: 20 });
+    expect(slow.steps[0]?.elapsedMs).toBe(100);
+    expect(fast.steps[0]?.elapsedMs).toBe(10);
+    const slowLast = slow.steps.at(-1)?.elapsedMs ?? 0;
+    const fastLast = fast.steps.at(-1)?.elapsedMs ?? 0;
+    expect(slowLast).toBeGreaterThan(fastLast);
   });
 
   it('TCPの番号が応答で正しく確認される', () => {
