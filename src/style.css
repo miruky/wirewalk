@@ -731,6 +731,67 @@ a {
   max-width: 62ch;
 }
 
+/* キーボード操作のダイアログ。* { margin: 0 } を打ち消して中央に寄せる */
+
+.help-dialog {
+  margin: auto;
+  width: min(420px, calc(100vw - 32px));
+  padding: calc(var(--step) * 3);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+}
+
+.help-dialog::backdrop {
+  background: rgb(12 14 18 / 0.46);
+}
+
+.help-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--step);
+  margin-bottom: calc(var(--step) * 2);
+}
+
+.help-head h2 {
+  font-family: var(--serif);
+  font-size: 1.18rem;
+  font-weight: 600;
+}
+
+.help-list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 11px 18px;
+  align-items: baseline;
+}
+
+.help-list dt {
+  display: flex;
+  gap: 5px;
+}
+
+.help-list dd {
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+kbd {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  line-height: 1;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--hair);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  padding: 4px 6px;
+  min-width: 1.1em;
+  text-align: center;
+}
+
 /* フォーカス */
 
 :focus-visible {
