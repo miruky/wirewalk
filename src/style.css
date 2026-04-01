@@ -3,7 +3,7 @@
    地は温度のある中立色に保つ。数値は等幅、ラベルは等幅で揃えて視線を案内する。 */
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 
   /* 地と文字 */
   --paper: #f4f3ef;
@@ -38,30 +38,32 @@
   --sans: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', system-ui, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #131419;
-    --surface: #1a1c22;
-    --panel: #23252d;
-    --ink: #e8e7e2;
-    --muted: #969ba3;
-    --faint: #969ba3;
+/* ダークは単なる反転でなく、沈んだ地色に合わせてアクセントと罫線を調整する。
+   data-theme は index.html のインラインスクリプトが描画前に解決して付ける */
+:root[data-theme='dark'] {
+  color-scheme: dark;
 
-    --hair: #2a2c34;
-    --rule: #353841;
+  --paper: #131419;
+  --surface: #1a1c22;
+  --panel: #23252d;
+  --ink: #e8e7e2;
+  --muted: #969ba3;
+  --faint: #969ba3;
 
-    --accent: #3ac6d7;
-    --accent-weak: #102f35;
-    --error: #ff8a8a;
+  --hair: #2a2c34;
+  --rule: #353841;
 
-    --lifeline: #424650;
+  --accent: #3ac6d7;
+  --accent-weak: #102f35;
+  --error: #ff8a8a;
 
-    --phase-dns: #5d9bf6;
-    --phase-tcp: #ff9a4d;
-    --phase-tls: #ab8cff;
-    --phase-http: #57c478;
-    --phase-close: #8b929c;
-  }
+  --lifeline: #424650;
+
+  --phase-dns: #5d9bf6;
+  --phase-tcp: #ff9a4d;
+  --phase-tls: #ab8cff;
+  --phase-http: #57c478;
+  --phase-close: #8b929c;
 }
 
 * {
@@ -116,12 +118,71 @@ a {
 
 .app-header {
   display: flex;
-  align-items: flex-end;
+  flex-direction: column;
+  gap: calc(var(--step) * 2.5);
+  padding-bottom: calc(var(--step) * 2.5);
+  border-bottom: 1px solid var(--rule);
+}
+
+.masthead {
+  display: flex;
+  align-items: flex-start;
   justify-content: space-between;
   gap: calc(var(--step) * 3);
   flex-wrap: wrap;
-  padding-bottom: calc(var(--step) * 2.5);
-  border-bottom: 1px solid var(--rule);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--step) * 1);
+}
+
+.icon-button {
+  font: inherit;
+  font-size: 0.78rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 6px 9px;
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  color: var(--ink);
+  border-color: var(--hair);
+  background: var(--surface);
+}
+
+.icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.icon-ring {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+}
+
+.icon-fill {
+  fill: currentColor;
+}
+
+.icon-link {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+#share-button .icon {
+  fill: currentColor;
 }
 
 .brand {
@@ -208,6 +269,35 @@ a {
 
 .field input:hover {
   border-color: var(--rule);
+}
+
+/* ラベルと入力を横並びにする小さなフィールド(TLS版・遅延) */
+.field-inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 7px;
+  padding-bottom: 8px;
+}
+
+.field-inline > span {
+  text-transform: none;
+  letter-spacing: 0.04em;
+}
+
+.field-inline select {
+  font: inherit;
+  font-size: 0.84rem;
+  font-family: var(--mono);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--hair);
+  border-radius: 5px;
+  padding: 6px 8px;
+}
+
+/* hidden属性はdisplay指定に負けるので明示的に隠す */
+[hidden] {
+  display: none !important;
 }
 
 .toggle {
@@ -331,10 +421,25 @@ a {
   padding: 5px 8px;
 }
 
+.status {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--step);
+}
+
 .progress {
   font-family: var(--mono);
   font-size: 0.8rem;
   color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.elapsed {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--accent);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
 }
@@ -477,6 +582,7 @@ a {
 
 .arrow.hidden {
   visibility: hidden;
+  opacity: 0;
 }
 
 .arrow.done {
