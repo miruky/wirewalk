@@ -20,6 +20,7 @@ import {
   type ThemePref,
 } from './lib/theme';
 import { Diagram } from './ui/diagram';
+import { PhaseRail } from './ui/phaserail';
 
 const BRAND_MARK = `
   <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true">
@@ -105,6 +106,7 @@ app.innerHTML = `
         <div class="diagram-scroll" id="diagram-host"></div>
       </section>
       <aside class="pane side-pane">
+        <nav class="phase-rail" id="phase-rail" aria-label="フェーズの一覧と現在地"></nav>
         <div class="controls" aria-label="再生操作">
           <button type="button" class="button button-primary" id="play-button">再生</button>
           <button type="button" class="button" id="back-button" aria-label="ひとつ戻る">戻る</button>
@@ -140,6 +142,9 @@ app.innerHTML = `
   </div>`;
 
 const diagram = new Diagram(document.getElementById('diagram-host') as HTMLElement);
+const phaseRail = new PhaseRail(document.getElementById('phase-rail') as HTMLElement, (target) =>
+  jumpTo(target),
+);
 const hostInput = document.getElementById('host-input') as HTMLInputElement;
 const tlsInput = document.getElementById('tls-input') as HTMLInputElement;
 const tlsVersionField = document.getElementById('tls-version-field') as HTMLElement;
@@ -168,6 +173,7 @@ function syncForm(): void {
 
 function render(): void {
   diagram.setProgress(index);
+  phaseRail.setActive(index);
   const step = timeline.steps[index];
   if (step) {
     (document.getElementById('explain-phase') as HTMLElement).textContent = PHASE_NAMES[step.phase];
@@ -199,6 +205,14 @@ function advance(): void {
   render();
 }
 
+// 任意のステップへ移動する。再生は止め、範囲内に丸める。フェーズ目盛りや
+// キーボードのジャンプ操作から呼ぶ。
+function jumpTo(target: number): void {
+  pause();
+  index = Math.max(0, Math.min(target, timeline.steps.length - 1));
+  render();
+}
+
 function play(): void {
   if (timer !== null) return;
   if (index >= timeline.steps.length - 1) index = -1;
@@ -212,6 +226,7 @@ function loadScenario(next: Scenario): void {
   scenario = next;
   timeline = buildTimeline(scenario);
   diagram.setTimeline(timeline);
+  phaseRail.setTimeline(timeline);
   index = 0;
   history.replaceState(null, '', scenarioToHash(scenario));
   syncForm();

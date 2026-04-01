@@ -55,6 +55,15 @@ export function scenarioToHash(scenario: Scenario): string {
   return `#${params.toString()}`;
 }
 
+// 図を書き出すときのファイル名の幹。条件が一目で分かるよう、ホスト名と
+// 主要なスイッチを連ねる。拡張子は呼び出し側で付ける。
+export function exportBasename(scenario: Scenario): string {
+  const parts = ['wirewalk', scenario.host];
+  parts.push(scenario.tls ? `tls${scenario.tlsVersion.replace('.', '')}` : 'http');
+  if (scenario.dnsCached) parts.push('cached');
+  return parts.join('-');
+}
+
 export function scenarioFromHash(hash: string): Scenario | null {
   if (!hash.startsWith('#')) return null;
   const params = new URLSearchParams(hash.slice(1));
