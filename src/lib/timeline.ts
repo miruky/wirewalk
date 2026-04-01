@@ -40,6 +40,28 @@ export const PHASE_NAMES: Record<Phase, string> = {
   close: 'TCPクローズ',
 };
 
+export interface PhaseSegment {
+  phase: Phase;
+  name: string;
+  start: number;
+  count: number;
+}
+
+// 連続する同一フェーズのステップをひとまとまりにする。フェーズの目盛り(rail)に使う。
+// タイムラインはフェーズが混ざらない前提だが、隣接判定で一般化しておく。
+export function phaseSegments(steps: Step[]): PhaseSegment[] {
+  const segments: PhaseSegment[] = [];
+  steps.forEach((step, index) => {
+    const last = segments[segments.length - 1];
+    if (last && last.phase === step.phase) {
+      last.count += 1;
+    } else {
+      segments.push({ phase: step.phase, name: PHASE_NAMES[step.phase], start: index, count: 1 });
+    }
+  });
+  return segments;
+}
+
 const ALL_ACTORS: Record<ActorId, Actor> = {
   client: { id: 'client', name: 'ブラウザ', role: 'クライアント' },
   resolver: { id: 'resolver', name: 'フルリゾルバ', role: 'ISP等のDNSキャッシュ' },
