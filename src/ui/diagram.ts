@@ -12,6 +12,26 @@ const ROW_GAP = 46;
 const LANE_MIN_GAP = 132;
 const FOOTER = 24;
 
+// 書き出し用に埋め込むスタイル。画面はCSS変数で色を決めるが、単体SVGでは
+// 参照できないため、ライトテーマの具体値を固定で焼き込む。
+const EXPORT_STYLE = `
+  text { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .export-bg { fill: #f4f3ef; }
+  .actor-box { fill: #eeece6; stroke: #e2e0d8; stroke-width: 1; }
+  .actor-name { fill: #20222a; font-weight: 600; font-size: 12.5px; }
+  .actor-role { fill: #6a6e76; font-size: 10px; }
+  .lifeline { stroke: #c7c5bc; stroke-width: 1; stroke-dasharray: 2 5; }
+  .wire { stroke-width: 1.8; fill: none; }
+  .arrow-head { fill: #9a9890; }
+  .wire-label { fill: #20222a; font-size: 10.5px; }
+  .phase-chip { fill: #6a6e76; font-weight: 700; font-size: 9.5px; letter-spacing: 0.5px; }
+  .phase-dns .wire { stroke: #1f5fc0; }
+  .phase-tcp .wire { stroke: #c85a12; }
+  .phase-tls .wire { stroke: #6843c7; }
+  .phase-http .wire { stroke: #2a8244; }
+  .phase-close .wire { stroke: #5c636e; }
+`;
+
 function svgEl<K extends keyof SVGElementTagNameMap>(
   tag: K,
   attrs: Record<string, string> = {},
@@ -175,5 +195,37 @@ export class Diagram {
 
   stepCount(): number {
     return this.steps.length;
+  }
+
+  // 現在の図を、CSS変数に依存しない単体のSVG文字列として書き出す。
+  // すべてのステップを表示し、進行用のクラスと装飾(帯・パケット)は落とす。
+  toStaticSVG(): string {
+    const clone = this.svg.cloneNode(true) as SVGSVGElement;
+    clone.setAttribute('xmlns', SVG_NS);
+    clone.removeAttribute('role');
+    clone.removeAttribute('aria-label');
+
+    clone.querySelectorAll('.row-band, .packet').forEach((el) => el.remove());
+    clone.querySelectorAll('.arrow').forEach((el) => {
+      el.classList.remove('hidden', 'current', 'done');
+    });
+
+    const style = document.createElementNS(SVG_NS, 'style');
+    style.textContent = EXPORT_STYLE;
+    const bg = svgEl('rect', {
+      x: '0',
+      y: '0',
+      width: clone.getAttribute('width') ?? '0',
+      height: clone.getAttribute('height') ?? '0',
+      class: 'export-bg',
+    });
+    clone.prepend(bg);
+    clone.prepend(style);
+
+    const body =
+      typeof XMLSerializer !== 'undefined'
+        ? new XMLSerializer().serializeToString(clone)
+        : (clone.outerHTML ?? '');
+    return `<?xml version="1.0" encoding="UTF-8"?>\n${body}`;
   }
 }
