@@ -1,15 +1,24 @@
-// 画面の組み立てと再生制御。シナリオからタイムラインを作り、
-// 現在ステップの解説と図の進行を同期させる。シナリオはURLハッシュに残す。
+// 画面の組み立てと再生制御。シナリオからタイムラインを作り、現在ステップの解説と
+// 図の進行を同期させる。シナリオはURLハッシュに残し、テーマは描画前に解決済み。
 
 import './style.css';
 import {
   DEFAULT_SCENARIO,
   normalizeHost,
+  RTT_CHOICES,
   scenarioFromHash,
   scenarioToHash,
   type Scenario,
 } from './lib/scenario';
 import { buildTimeline, PHASE_NAMES, type Timeline } from './lib/timeline';
+import {
+  nextPref,
+  PREF_LABEL,
+  readPref,
+  resolveTheme,
+  THEME_KEY,
+  type ThemePref,
+} from './lib/theme';
 import { Diagram } from './ui/diagram';
 
 const BRAND_MARK = `
@@ -21,17 +30,46 @@ const BRAND_MARK = `
     <circle cx="30" cy="44" r="4.5" class="mark-packet" />
   </svg>`;
 
+const THEME_ICON = `
+  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+    <circle cx="12" cy="12" r="8" class="icon-ring" />
+    <path d="M 12 4 A 8 8 0 0 0 12 20 Z" class="icon-fill" />
+  </svg>`;
+
+const SHARE_ICON = `
+  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+    <circle cx="6" cy="12" r="2.4" />
+    <circle cx="18" cy="6" r="2.4" />
+    <circle cx="18" cy="18" r="2.4" />
+    <path d="M 8.1 11 L 15.9 7 M 8.1 13 L 15.9 17" class="icon-link" />
+  </svg>`;
+
 const app = document.getElementById('app');
 if (!app) throw new Error('#app が見つかりません');
+
+const rttOptions = RTT_CHOICES.map(
+  (ms) =>
+    `<option value="${ms}"${ms === DEFAULT_SCENARIO.rttMs ? ' selected' : ''}>往復 ${ms}ms</option>`,
+).join('');
 
 app.innerHTML = `
   <div class="app">
     <header class="app-header">
-      <div class="brand">
-        ${BRAND_MARK}
-        <div class="brand-text">
-          <h1>wirewalk</h1>
-          <p class="tagline">URLを開いた瞬間の裏側を、一歩ずつ歩いて眺める</p>
+      <div class="masthead">
+        <div class="brand">
+          ${BRAND_MARK}
+          <div class="brand-text">
+            <h1>wirewalk</h1>
+            <p class="tagline">URLを開いた瞬間の裏側を、一歩ずつ歩いて眺める</p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button type="button" class="icon-button" id="share-button" aria-label="この条件のURLをコピー">
+            ${SHARE_ICON}<span id="share-label">共有</span>
+          </button>
+          <button type="button" class="icon-button" id="theme-toggle" aria-label="テーマを切り替える">
+            ${THEME_ICON}<span id="theme-label">自動</span>
+          </button>
         </div>
       </div>
       <form class="scenario-form" id="scenario-form">
@@ -41,13 +79,24 @@ app.innerHTML = `
         </label>
         <label class="toggle">
           <input id="tls-input" type="checkbox" />
-          <span>HTTPS(TLS 1.3)</span>
+          <span>HTTPS</span>
+        </label>
+        <label class="field field-inline" id="tls-version-field">
+          <span>TLS</span>
+          <select id="tls-version-select">
+            <option value="1.3">1.3(1-RTT)</option>
+            <option value="1.2">1.2(2-RTT)</option>
+          </select>
         </label>
         <label class="toggle">
           <input id="cache-input" type="checkbox" />
           <span>DNSキャッシュ命中</span>
         </label>
-        <button type="submit" class="button">この条件で見る</button>
+        <label class="field field-inline">
+          <span>遅延</span>
+          <select id="rtt-select">${rttOptions}</select>
+        </label>
+        <button type="submit" class="button button-primary">この条件で見る</button>
       </form>
     </header>
     <p class="form-error" id="form-error" hidden>ホスト名の形式が正しくありません(例: example.com)</p>
@@ -70,7 +119,10 @@ app.innerHTML = `
             </select>
           </label>
         </div>
-        <p class="progress" id="progress" aria-live="polite"></p>
+        <div class="status">
+          <p class="progress" id="progress" aria-live="polite"></p>
+          <p class="elapsed" id="elapsed" aria-live="polite"></p>
+        </div>
         <article class="explain" aria-live="polite">
           <p class="explain-phase" id="explain-phase"></p>
           <h2 id="explain-title"></h2>
@@ -80,7 +132,8 @@ app.innerHTML = `
     </main>
     <footer class="app-footer">
       <p>
-        実際の通信は行わず、教材として代表的な流れを再現している。IP・シーケンス番号・TTLは例示。
+        実際の通信は行わず、教材として代表的な流れを再現している。IP・シーケンス番号・TTL・
+        経過時間は例示で、経過は各メッセージを片道遅延として積んだ概算。
         <a href="https://github.com/miruky/wirewalk">ソースコード</a>
       </p>
     </footer>
@@ -89,10 +142,14 @@ app.innerHTML = `
 const diagram = new Diagram(document.getElementById('diagram-host') as HTMLElement);
 const hostInput = document.getElementById('host-input') as HTMLInputElement;
 const tlsInput = document.getElementById('tls-input') as HTMLInputElement;
+const tlsVersionField = document.getElementById('tls-version-field') as HTMLElement;
+const tlsVersionSelect = document.getElementById('tls-version-select') as HTMLSelectElement;
 const cacheInput = document.getElementById('cache-input') as HTMLInputElement;
+const rttSelect = document.getElementById('rtt-select') as HTMLSelectElement;
 const formError = document.getElementById('form-error') as HTMLElement;
 const playButton = document.getElementById('play-button') as HTMLButtonElement;
 const progressEl = document.getElementById('progress') as HTMLElement;
+const elapsedEl = document.getElementById('elapsed') as HTMLElement;
 
 let scenario: Scenario = scenarioFromHash(location.hash) ?? DEFAULT_SCENARIO;
 let timeline: Timeline = buildTimeline(scenario);
@@ -103,7 +160,10 @@ let speed = 1;
 function syncForm(): void {
   hostInput.value = scenario.host;
   tlsInput.checked = scenario.tls;
+  tlsVersionSelect.value = scenario.tlsVersion;
   cacheInput.checked = scenario.dnsCached;
+  rttSelect.value = String(scenario.rttMs);
+  tlsVersionField.hidden = !scenario.tls;
 }
 
 function render(): void {
@@ -114,6 +174,7 @@ function render(): void {
     (document.getElementById('explain-phase') as HTMLElement).dataset.phase = step.phase;
     (document.getElementById('explain-title') as HTMLElement).textContent = step.title;
     (document.getElementById('explain-detail') as HTMLElement).textContent = step.detail;
+    elapsedEl.textContent = `経過 ~${step.elapsedMs}ms`;
   }
   progressEl.textContent = `${index + 1} / ${timeline.steps.length}`;
   (document.getElementById('back-button') as HTMLButtonElement).disabled = index === 0;
@@ -164,9 +225,19 @@ function loadScenario(next: Scenario): void {
     const host = normalizeHost(hostInput.value);
     formError.hidden = host !== null;
     if (!host) return;
-    loadScenario({ host, tls: tlsInput.checked, dnsCached: cacheInput.checked });
+    loadScenario({
+      host,
+      tls: tlsInput.checked,
+      tlsVersion: tlsVersionSelect.value === '1.2' ? '1.2' : '1.3',
+      dnsCached: cacheInput.checked,
+      rttMs: Number(rttSelect.value) || DEFAULT_SCENARIO.rttMs,
+    });
   },
 );
+
+tlsInput.addEventListener('change', () => {
+  tlsVersionField.hidden = !tlsInput.checked;
+});
 
 playButton.addEventListener('click', () => {
   if (timer !== null) {
@@ -220,6 +291,59 @@ document.addEventListener('keydown', (event) => {
     event.preventDefault();
     playButton.click();
   }
+});
+
+// テーマ。保存値を読み、解決済みのライト/ダークをdata-themeに反映する。
+// 描画前の初期適用はindex.htmlのインラインスクリプトが済ませている。
+const themeLabel = document.getElementById('theme-label') as HTMLElement;
+const systemDark =
+  typeof window.matchMedia === 'function'
+    ? window.matchMedia('(prefers-color-scheme: dark)')
+    : null;
+let themePref: ThemePref = readPref((k) => {
+  try {
+    return localStorage.getItem(k);
+  } catch {
+    return null;
+  }
+});
+
+function applyTheme(): void {
+  const resolved = resolveTheme(themePref, systemDark?.matches ?? false);
+  document.documentElement.dataset.theme = resolved;
+  themeLabel.textContent = PREF_LABEL[themePref];
+}
+
+document.getElementById('theme-toggle')?.addEventListener('click', () => {
+  themePref = nextPref(themePref);
+  try {
+    localStorage.setItem(THEME_KEY, themePref);
+  } catch {
+    // 保存できなくても現在のセッションには反映する
+  }
+  applyTheme();
+});
+
+systemDark?.addEventListener('change', () => {
+  if (themePref === 'system') applyTheme();
+});
+
+applyTheme();
+
+// 共有。現在のURLをクリップボードへ写し、短い手応えを返す
+const shareLabel = document.getElementById('share-label') as HTMLElement;
+let shareReset: number | null = null;
+document.getElementById('share-button')?.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(location.href);
+    shareLabel.textContent = 'コピー済み';
+  } catch {
+    shareLabel.textContent = location.href;
+  }
+  if (shareReset !== null) window.clearTimeout(shareReset);
+  shareReset = window.setTimeout(() => {
+    shareLabel.textContent = '共有';
+  }, 1600);
 });
 
 loadScenario(scenario);
