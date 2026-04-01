@@ -37,12 +37,49 @@ describe('normalizeHost', () => {
 
 describe('hashとの相互変換', () => {
   it('往復で同じシナリオに戻る', () => {
-    const scenario = { host: 'blog.example.jp', tls: false, dnsCached: true };
+    const scenario = {
+      host: 'blog.example.jp',
+      tls: false,
+      tlsVersion: '1.3' as const,
+      dnsCached: true,
+      rttMs: 200,
+    };
     expect(scenarioFromHash(scenarioToHash(scenario))).toEqual(scenario);
+  });
+
+  it('TLS1.2と遅延の指定も往復する', () => {
+    const scenario = {
+      host: 'shop.example.com',
+      tls: true,
+      tlsVersion: '1.2' as const,
+      dnsCached: false,
+      rttMs: 20,
+    };
+    const hash = scenarioToHash(scenario);
+    expect(hash).toContain('tlsv=1.2');
+    expect(hash).toContain('rtt=20');
+    expect(scenarioFromHash(hash)).toEqual(scenario);
   });
 
   it('既定値はhostだけの短いハッシュになる', () => {
     expect(scenarioToHash(DEFAULT_SCENARIO)).toBe('#host=example.com');
+  });
+
+  it('TLSを切るとTLSバージョンはハッシュに出さず1.3に倒れる', () => {
+    const hash = scenarioToHash({
+      host: 'example.org',
+      tls: false,
+      tlsVersion: '1.2',
+      dnsCached: false,
+      rttMs: 80,
+    });
+    expect(hash).toBe('#host=example.org&tls=off');
+    expect(scenarioFromHash(hash)?.tlsVersion).toBe('1.3');
+  });
+
+  it('範囲外の遅延は既定に丸める', () => {
+    expect(scenarioFromHash('#host=example.com&rtt=99999')?.rttMs).toBe(2000);
+    expect(scenarioFromHash('#host=example.com&rtt=abc')?.rttMs).toBe(80);
   });
 
   it('壊れたハッシュはnull', () => {
