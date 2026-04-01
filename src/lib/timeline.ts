@@ -1,6 +1,7 @@
 // シナリオから、登場ノードと通信ステップの時系列を組み立てる。
 // 内容は決定的で、描画や再生速度には関知しない。解説文はここに集約し、
-// 教材としての正確さ(TLS 1.3の1-RTT、TCPの全二重クローズ等)を保つ。
+// 教材としての正確さ(TLS 1.3の1-RTT、TLS 1.2の2-RTT、TCPの全二重クローズ等)を保つ。
+// 各ステップには、片道遅延を積み上げた概算の経過時間も持たせる。
 
 import type { Scenario } from './scenario';
 
@@ -21,7 +22,10 @@ export interface Step {
   label: string;
   title: string;
   detail: string;
+  elapsedMs: number;
 }
+
+type RawStep = Omit<Step, 'elapsedMs'>;
 
 export interface Timeline {
   actors: Actor[];
@@ -50,7 +54,7 @@ function tldOf(host: string): string {
   return parts[parts.length - 1] ?? 'com';
 }
 
-function dnsSteps(scenario: Scenario): Step[] {
+function dnsSteps(scenario: Scenario): RawStep[] {
   const { host } = scenario;
   const query = `${host} の A レコードは?`;
   if (scenario.dnsCached) {
@@ -145,7 +149,7 @@ function dnsSteps(scenario: Scenario): Step[] {
   ];
 }
 
-function tcpSteps(): Step[] {
+function tcpSteps(): RawStep[] {
   return [
     {
       phase: 'tcp',
@@ -177,7 +181,7 @@ function tcpSteps(): Step[] {
   ];
 }
 
-function tlsSteps(scenario: Scenario): Step[] {
+function tls13Steps(scenario: Scenario): RawStep[] {
   return [
     {
       phase: 'tls',
@@ -208,7 +212,51 @@ function tlsSteps(scenario: Scenario): Step[] {
   ];
 }
 
-function httpSteps(scenario: Scenario): Step[] {
+function tls12Steps(scenario: Scenario): RawStep[] {
+  return [
+    {
+      phase: 'tls',
+      from: 'client',
+      to: 'server',
+      label: 'ClientHello',
+      title: 'ClientHello',
+      detail: `対応バージョン・暗号スイート候補・クライアントランダム・SNI(${scenario.host})を送る。TLS 1.2では鍵共有はまだ始めない。`,
+    },
+    {
+      phase: 'tls',
+      from: 'server',
+      to: 'client',
+      label: 'ServerHello + Certificate + ServerHelloDone',
+      title: 'ServerHello一式',
+      detail:
+        'サーバは暗号スイートとサーバランダムを決め、証明書チェーンと(ECDHEなら)鍵交換パラメータを送り、ServerHelloDoneで一区切りつける。',
+    },
+    {
+      phase: 'tls',
+      from: 'client',
+      to: 'server',
+      label: 'ClientKeyExchange + ChangeCipherSpec + Finished',
+      title: '鍵交換と暗号化開始(クライアント)',
+      detail:
+        'クライアントは鍵交換値を送って共有鍵を確定し、ChangeCipherSpecで暗号化に切り替え、Finishedで合意を確認する。ここで1往復目が終わる。',
+    },
+    {
+      phase: 'tls',
+      from: 'server',
+      to: 'client',
+      label: 'ChangeCipherSpec + Finished',
+      title: '暗号化開始(サーバ)',
+      detail:
+        'サーバも暗号化に切り替えてFinishedを返す。TLS 1.2は2往復(2-RTT)かかり、これがTLS 1.3との所要時間の差になる。',
+    },
+  ];
+}
+
+function tlsSteps(scenario: Scenario): RawStep[] {
+  return scenario.tlsVersion === '1.2' ? tls12Steps(scenario) : tls13Steps(scenario);
+}
+
+function httpSteps(scenario: Scenario): RawStep[] {
   const scheme = scenario.tls ? 'HTTPS' : 'HTTP';
   return [
     {
@@ -233,7 +281,7 @@ function httpSteps(scenario: Scenario): Step[] {
   ];
 }
 
-function closeSteps(): Step[] {
+function closeSteps(): RawStep[] {
   return [
     {
       phase: 'close',
@@ -271,14 +319,25 @@ function closeSteps(): Step[] {
   ];
 }
 
+// 各メッセージを片道遅延(往復の半分)の一区間とみなして経過時間を積む。
+// 厳密なモデルではなく、ハンドシェイクの往復が積み上がる感覚を伝えるための概算。
+export function oneWayMs(rttMs: number): number {
+  return rttMs / 2;
+}
+
 export function buildTimeline(scenario: Scenario): Timeline {
-  const steps: Step[] = [
+  const raw: RawStep[] = [
     ...dnsSteps(scenario),
     ...tcpSteps(),
     ...(scenario.tls ? tlsSteps(scenario) : []),
     ...httpSteps(scenario),
     ...closeSteps(),
   ];
+  const hop = oneWayMs(scenario.rttMs);
+  const steps: Step[] = raw.map((step, index) => ({
+    ...step,
+    elapsedMs: Math.round((index + 1) * hop),
+  }));
   const present = new Set<ActorId>();
   for (const step of steps) {
     present.add(step.from);
