@@ -53,4 +53,34 @@ describe('main', () => {
     (document.getElementById('rewind-button') as HTMLButtonElement).click();
     expect(document.getElementById('progress')?.textContent).toBe('1 / 17');
   });
+
+  it('EndとHomeで末尾と先頭へ飛ぶ', () => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'End' }));
+    expect(document.getElementById('progress')?.textContent).toBe('17 / 17');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home' }));
+    expect(document.getElementById('progress')?.textContent).toBe('1 / 17');
+  });
+
+  it('数字キーで対応するフェーズの先頭へ飛ぶ', () => {
+    // TLSなしのフェーズは DNS(1) / TCP(2) / HTTP(3) / クローズ(4)。2でTCP先頭へ
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: '2' }));
+    expect(document.getElementById('progress')?.textContent).toBe('9 / 17');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home' }));
+    expect(document.getElementById('progress')?.textContent).toBe('1 / 17');
+  });
+
+  it('?キーでショートカット一覧を開閉する', () => {
+    const dialog = document.getElementById('help-dialog') as HTMLDialogElement;
+    expect(dialog.open).toBe(false);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: '?' }));
+    expect(dialog.open).toBe(true);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: '?' }));
+    expect(dialog.open).toBe(false);
+  });
+
+  it('フェーズ目盛りと保存・操作ボタンが揃っている', () => {
+    expect(document.querySelectorAll('.rail-item').length).toBe(4);
+    expect(document.getElementById('export-button')).not.toBeNull();
+    expect(document.getElementById('help-button')).not.toBeNull();
+  });
 });
