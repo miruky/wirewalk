@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_SCENARIO,
+  exportBasename,
   isValidHost,
   normalizeHost,
   scenarioFromHash,
@@ -86,5 +87,18 @@ describe('hashとの相互変換', () => {
     expect(scenarioFromHash('')).toBeNull();
     expect(scenarioFromHash('#host=bad host')).toBeNull();
     expect(scenarioFromHash('#tls=off')).toBeNull();
+  });
+});
+
+describe('exportBasename', () => {
+  it('既定はホスト名とTLSバージョンを連ねる', () => {
+    expect(exportBasename(DEFAULT_SCENARIO)).toBe('wirewalk-example.com-tls13');
+  });
+
+  it('TLSを切るとhttp、キャッシュ命中は接尾辞が付く', () => {
+    expect(exportBasename({ ...DEFAULT_SCENARIO, tls: false })).toBe('wirewalk-example.com-http');
+    expect(exportBasename({ ...DEFAULT_SCENARIO, tlsVersion: '1.2', dnsCached: true })).toBe(
+      'wirewalk-example.com-tls12-cached',
+    );
   });
 });
