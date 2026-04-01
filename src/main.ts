@@ -4,13 +4,14 @@
 import './style.css';
 import {
   DEFAULT_SCENARIO,
+  exportBasename,
   normalizeHost,
   RTT_CHOICES,
   scenarioFromHash,
   scenarioToHash,
   type Scenario,
 } from './lib/scenario';
-import { buildTimeline, PHASE_NAMES, type Timeline } from './lib/timeline';
+import { buildTimeline, phaseSegments, PHASE_NAMES, type Timeline } from './lib/timeline';
 import {
   nextPref,
   PREF_LABEL,
@@ -45,6 +46,22 @@ const SHARE_ICON = `
     <path d="M 8.1 11 L 15.9 7 M 8.1 13 L 15.9 17" class="icon-link" />
   </svg>`;
 
+const SAVE_ICON = `
+  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M 12 4 V 14 M 8 10.5 L 12 14.5 L 16 10.5" class="icon-link" />
+    <path d="M 5 18.5 H 19" class="icon-link" />
+  </svg>`;
+
+const KEYS_ICON = `
+  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+    <rect x="2.5" y="6.5" width="19" height="11" rx="2.2" class="icon-ring" />
+    <path d="M 7.5 14 H 16.5" class="icon-link" />
+    <circle cx="6.5" cy="10.4" r="0.9" class="icon-fill" />
+    <circle cx="10" cy="10.4" r="0.9" class="icon-fill" />
+    <circle cx="13.5" cy="10.4" r="0.9" class="icon-fill" />
+    <circle cx="17" cy="10.4" r="0.9" class="icon-fill" />
+  </svg>`;
+
 const app = document.getElementById('app');
 if (!app) throw new Error('#app が見つかりません');
 
@@ -67,6 +84,12 @@ app.innerHTML = `
         <div class="header-actions">
           <button type="button" class="icon-button" id="share-button" aria-label="この条件のURLをコピー">
             ${SHARE_ICON}<span id="share-label">共有</span>
+          </button>
+          <button type="button" class="icon-button" id="export-button" aria-label="図をSVGで保存">
+            ${SAVE_ICON}<span>保存</span>
+          </button>
+          <button type="button" class="icon-button" id="help-button" aria-label="キーボード操作を表示">
+            ${KEYS_ICON}<span>操作</span>
           </button>
           <button type="button" class="icon-button" id="theme-toggle" aria-label="テーマを切り替える">
             ${THEME_ICON}<span id="theme-label">自動</span>
@@ -139,6 +162,24 @@ app.innerHTML = `
         <a href="https://github.com/miruky/wirewalk">ソースコード</a>
       </p>
     </footer>
+    <dialog class="help-dialog" id="help-dialog" aria-label="キーボード操作">
+      <div class="help-head">
+        <h2>キーボード操作</h2>
+        <button type="button" class="button" id="help-close">閉じる</button>
+      </div>
+      <dl class="help-list">
+        <dt><kbd>Space</kbd></dt>
+        <dd>再生 / 一時停止</dd>
+        <dt><kbd>&rarr;</kbd> <kbd>&larr;</kbd></dt>
+        <dd>1ステップ進む / 戻る</dd>
+        <dt><kbd>Home</kbd> <kbd>End</kbd></dt>
+        <dd>最初へ / 最後へ</dd>
+        <dt><kbd>1</kbd>&ndash;<kbd>5</kbd></dt>
+        <dd>各フェーズの先頭へ飛ぶ</dd>
+        <dt><kbd>?</kbd></dt>
+        <dd>この一覧の表示 / 非表示</dd>
+      </dl>
+    </dialog>
   </div>`;
 
 const diagram = new Diagram(document.getElementById('diagram-host') as HTMLElement);
@@ -155,12 +196,41 @@ const formError = document.getElementById('form-error') as HTMLElement;
 const playButton = document.getElementById('play-button') as HTMLButtonElement;
 const progressEl = document.getElementById('progress') as HTMLElement;
 const elapsedEl = document.getElementById('elapsed') as HTMLElement;
+const speedSelect = document.getElementById('speed-select') as HTMLSelectElement;
 
-let scenario: Scenario = scenarioFromHash(location.hash) ?? DEFAULT_SCENARIO;
+// localStorageは環境やプライベートモードで使えないことがある。失敗は握り潰し、
+// その場合は現在のセッションにだけ反映する(永続化はしない)。
+const LAST_KEY = 'wirewalk:last';
+const SPEED_KEY = 'wirewalk:speed';
+const SPEED_CHOICES = [0.5, 1, 2];
+
+function readStored(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStored(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // 保存できなくても動作は続ける
+  }
+}
+
+// URLハッシュを最優先。無ければ前回の条件、それも無ければ既定から始める。
+let scenario: Scenario =
+  scenarioFromHash(location.hash) ??
+  scenarioFromHash(readStored(LAST_KEY) ?? '') ??
+  DEFAULT_SCENARIO;
 let timeline: Timeline = buildTimeline(scenario);
 let index = 0;
 let timer: number | null = null;
-let speed = 1;
+const storedSpeed = Number(readStored(SPEED_KEY));
+let speed = SPEED_CHOICES.includes(storedSpeed) ? storedSpeed : 1;
+speedSelect.value = String(speed);
 
 function syncForm(): void {
   hostInput.value = scenario.host;
@@ -228,7 +298,9 @@ function loadScenario(next: Scenario): void {
   diagram.setTimeline(timeline);
   phaseRail.setTimeline(timeline);
   index = 0;
-  history.replaceState(null, '', scenarioToHash(scenario));
+  const hash = scenarioToHash(scenario);
+  history.replaceState(null, '', hash);
+  writeStored(LAST_KEY, hash);
   syncForm();
   render();
 }
@@ -281,31 +353,94 @@ document.getElementById('rewind-button')?.addEventListener('click', () => {
   render();
 });
 
-(document.getElementById('speed-select') as HTMLSelectElement).addEventListener('change', (e) => {
-  speed = Number.parseFloat((e.target as HTMLSelectElement).value) || 1;
+speedSelect.addEventListener('change', () => {
+  speed = Number.parseFloat(speedSelect.value) || 1;
+  writeStored(SPEED_KEY, String(speed));
   if (timer !== null) {
     pause();
     play();
   }
 });
 
+// キーボード操作の一覧を示すダイアログ。showModalが無い環境では属性で代替する。
+const helpDialog = document.getElementById('help-dialog') as HTMLDialogElement;
+function openHelp(): void {
+  if (helpDialog.open) return;
+  try {
+    if (typeof helpDialog.showModal === 'function') helpDialog.showModal();
+    else helpDialog.setAttribute('open', '');
+  } catch {
+    helpDialog.setAttribute('open', '');
+  }
+}
+function closeHelp(): void {
+  try {
+    if (typeof helpDialog.close === 'function') helpDialog.close();
+    else helpDialog.removeAttribute('open');
+  } catch {
+    helpDialog.removeAttribute('open');
+  }
+}
+document.getElementById('help-button')?.addEventListener('click', openHelp);
+document.getElementById('help-close')?.addEventListener('click', closeHelp);
+helpDialog.addEventListener('click', (event) => {
+  if (event.target === helpDialog) closeHelp();
+});
+
 document.addEventListener('keydown', (event) => {
+  if (event.key === '?') {
+    event.preventDefault();
+    if (helpDialog.open) closeHelp();
+    else openHelp();
+    return;
+  }
   if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) {
     return;
   }
-  if (event.key === 'ArrowRight') {
-    pause();
-    advance();
-  } else if (event.key === 'ArrowLeft') {
-    pause();
-    if (index > 0) {
-      index -= 1;
-      render();
-    }
-  } else if (event.key === ' ') {
-    event.preventDefault();
-    playButton.click();
+  if (helpDialog.open) return;
+  switch (event.key) {
+    case 'ArrowRight':
+      pause();
+      advance();
+      break;
+    case 'ArrowLeft':
+      jumpTo(index - 1);
+      break;
+    case 'Home':
+      event.preventDefault();
+      jumpTo(0);
+      break;
+    case 'End':
+      event.preventDefault();
+      jumpTo(timeline.steps.length - 1);
+      break;
+    case ' ':
+      event.preventDefault();
+      playButton.click();
+      break;
+    default:
+      if (/^[1-9]$/.test(event.key)) {
+        const segment = phaseSegments(timeline.steps)[Number(event.key) - 1];
+        if (segment) jumpTo(segment.start);
+      }
   }
+});
+
+// 図の書き出し。現在の条件のSVGをそのままファイルとして保存する。
+function download(filename: string, text: string, type: string): void {
+  const blob = new Blob([text], { type });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById('export-button')?.addEventListener('click', () => {
+  download(`${exportBasename(scenario)}.svg`, diagram.toStaticSVG(), 'image/svg+xml');
 });
 
 // テーマ。保存値を読み、解決済みのライト/ダークをdata-themeに反映する。
