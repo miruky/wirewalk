@@ -1,7 +1,7 @@
 {
   "name": "wirewalk",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "DNS解決・TCPハンドシェイク・TLSネゴシエーションの過程をステップ実行で可視化するシーケンスビューア",
   "scripts": {
