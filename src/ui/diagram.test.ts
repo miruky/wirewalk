@@ -67,4 +67,16 @@ describe('Diagram', () => {
     expect(host.querySelectorAll('.arrow').length).toBe(diagram.stepCount());
     expect(host.querySelectorAll('.lifeline').length).toBe(3);
   });
+
+  it('toStaticSVGは進行クラスを落とした単体SVG文字列を返す', () => {
+    const { diagram } = mount();
+    const svg = diagram.toStaticSVG();
+    expect(svg).toContain('<svg');
+    expect(svg).toContain('xmlns="http://www.w3.org/2000/svg"');
+    expect(svg).toContain('<style');
+    expect(svg).toContain('phase-dns');
+    expect(svg).toContain('SYN seq=1000');
+    expect(svg).not.toContain('row-band');
+    expect(svg).not.toContain('hidden');
+  });
 });
