@@ -36,6 +36,7 @@
   --step: 8px;
   --mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Roboto Mono', monospace;
   --sans: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', system-ui, sans-serif;
+  --serif: 'Hiragino Mincho ProN', 'Yu Mincho', YuMincho, 'Noto Serif JP', serif;
 }
 
 /* ダークは単なる反転でなく、沈んだ地色に合わせてアクセントと罫線を調整する。
@@ -394,6 +395,101 @@ a {
   background: var(--paper);
 }
 
+/* フェーズの目盛り。全体を俯瞰し、現在地と各フェーズの進みを示す。
+   カードにせず、色のティックと細い進捗線で構成する */
+
+.phase-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-bottom: calc(var(--step) * 2);
+  margin-bottom: calc(var(--step) * 0.5);
+  border-bottom: 1px solid var(--hair);
+}
+
+.rail-item {
+  font: inherit;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  column-gap: 9px;
+  row-gap: 5px;
+  width: 100%;
+  text-align: left;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.rail-item:hover {
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.rail-tick {
+  width: 3px;
+  height: 15px;
+  border-radius: 2px;
+  background: var(--phase-color, var(--muted));
+  opacity: 0.32;
+}
+
+.rail-item.active .rail-tick,
+.rail-item.done .rail-tick {
+  opacity: 1;
+}
+
+.rail-name {
+  font-size: 0.83rem;
+  letter-spacing: 0.01em;
+}
+
+.rail-item.active .rail-name {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.rail-count {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--faint);
+}
+
+.rail-bar {
+  grid-column: 1 / -1;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--hair);
+  overflow: hidden;
+}
+
+.rail-fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--phase-color, var(--accent));
+}
+
+.rail-item[data-phase='dns'] {
+  --phase-color: var(--phase-dns);
+}
+.rail-item[data-phase='tcp'] {
+  --phase-color: var(--phase-tcp);
+}
+.rail-item[data-phase='tls'] {
+  --phase-color: var(--phase-tls);
+}
+.rail-item[data-phase='http'] {
+  --phase-color: var(--phase-http);
+}
+.rail-item[data-phase='close'] {
+  --phase-color: var(--phase-close);
+}
+
 .controls {
   display: flex;
   align-items: center;
@@ -489,10 +585,11 @@ a {
 }
 
 .explain h2 {
-  font-size: 1.12rem;
+  font-family: var(--serif);
+  font-size: 1.32rem;
   font-weight: 600;
-  letter-spacing: -0.01em;
-  line-height: 1.4;
+  letter-spacing: 0.01em;
+  line-height: 1.45;
 }
 
 .explain p:last-child {
@@ -673,6 +770,20 @@ a {
   .field input,
   .speed select {
     transition: border-color 160ms ease;
+  }
+
+  .rail-item {
+    transition:
+      background 150ms ease,
+      color 150ms ease;
+  }
+
+  .rail-fill {
+    transition: width 360ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+
+  .rail-tick {
+    transition: opacity 220ms ease;
   }
 
   .arrow {
